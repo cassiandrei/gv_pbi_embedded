@@ -8,6 +8,6 @@
 </head>
 <body>
     <h1>Relatório Power BI Embutido</h1>
-    <iframe title="Relatório Power BI" width="1024" height="1060" src="{% url 'power_bi_view_proxy' %}" frameborder="0" allowfullscreen="true"></iframe>
+    {{ iframe_html|safe }}
 </body>
 </html>

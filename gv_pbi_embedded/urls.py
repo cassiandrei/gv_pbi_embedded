@@ -20,5 +20,5 @@ from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('bi/', include('power_bi_embedded.urls'))
+    path('', include('power_bi_embedded.urls'))
 ]

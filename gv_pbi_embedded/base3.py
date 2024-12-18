@@ -71,15 +71,15 @@ class PowerBIEmbedder:
 
 
 # Exemplo de uso:
-powerbi = PowerBIEmbedder(
-    application_id="0e8c2906-5218-4c4b-8ff3-4c1165078879",
-    workspace_id="8a9d43bd-baa4-4884-9361-03b664cf3551",
-    report_id="b465f0ac-f047-4404-b18d-d32a15d98bf7",
-    application_secret="gAG8Q~iHgtSshl6DeH3FCtm0m56qJniyVk55CaXN",
-    tenant_id="1345f5d4-b3ee-4534-bd31-b2cda5d2000d"
-)
-
-access_token = powerbi.get_access_token()
-embed_token = powerbi.get_embed_token()
-iframe_html = powerbi.generate_iframe(embed_token)
-print(iframe_html)
+# powerbi = PowerBIEmbedder(
+#     application_id="0e8c2906-5218-4c4b-8ff3-4c1165078879",
+#     workspace_id="8a9d43bd-baa4-4884-9361-03b664cf3551",
+#     report_id="b465f0ac-f047-4404-b18d-d32a15d98bf7",
+#     application_secret="gAG8Q~iHgtSshl6DeH3FCtm0m56qJniyVk55CaXN",
+#     tenant_id="1345f5d4-b3ee-4534-bd31-b2cda5d2000d"
+# )
+#
+# access_token = powerbi.get_access_token()
+# embed_token = powerbi.get_embed_token()
+# iframe_html = powerbi.generate_iframe(embed_token)
+# print(iframe_html)

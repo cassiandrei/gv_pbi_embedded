@@ -60,11 +60,6 @@ class PowerBIEmbedder:
         url = f"https://api.powerbi.com/v1.0/myorg/GenerateToken"
         headers = {"Authorization": f"Bearer {access_token}"}
         body = {
-            "datasets": [
-                {
-                    "id": self.dataset_id,
-                }
-            ],
             "reports": [
                 {
                     "id": self.report_id,
@@ -85,10 +80,10 @@ class PowerBIEmbedder:
 
 # Exemplo de uso:
 powerbi = PowerBIEmbedder(
-    application_id="d92ec15e-e6dc-4505-9747-b5303a56dd4e",
-    workspace_id="8a9d43bd-baa4-4884-9361-03b664cf3551",
-    report_id="b465f0ac-f047-4404-b18d-d32a15d98bf7",
-    application_secret="gAG8Q~iHgtSshl6DeH3FCtm0m56qJniyVk55CaXN",
+    application_id="750de238-6035-48a4-ae47-01ca6e55e53b",
+    workspace_id="8d1c951b-5b2c-4903-9364-16788c518ab8",
+    report_id="40a0a66c-d422-4c91-82ab-3c5171e16fad",
+    application_secret="aiv8Q~j3Fc6J3H~eWRBF8vzQrrISnaFOcPpc7dvn",
     tenant_id="1345f5d4-b3ee-4534-bd31-b2cda5d2000d"
 )
 

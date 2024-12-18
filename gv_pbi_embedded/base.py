@@ -9,6 +9,7 @@ class PowerBIService:
         self.tenant_id = "1345f5d4-b3ee-4534-bd31-b2cda5d2000d"  # ID do Objeto (locatário)
         self.scope = ["https://analysis.windows.net/powerbi/api/.default"]
         self.authority = f"https://login.microsoftonline.com/{self.tenant_id}"
+        self.workspace_id = '8d1c951b-5b2c-4903-9364-16788c518ab8'
         self.app = ConfidentialClientApplication(
             self.client_id, self.client_secret, authority=self.authority
         )
@@ -45,7 +46,7 @@ class PowerBIService:
         return response.json()
 
     def test_acess_token(self):
-        url = 'https://api.powerbi.com/v1.0/myorg/reports'
+        url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/reports"
         access_token = self.get_access_token()
         headers = {"Authorization": f"Bearer {access_token}"}
         response = requests.get(url=url, headers=headers)

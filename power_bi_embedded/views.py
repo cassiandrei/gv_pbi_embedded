@@ -6,17 +6,19 @@ from gv_pbi_embedded.base4 import (PowerBIEmbedder)
 
 
 def power_bi_view(request):
-    # Exemplo de uso:
+    application_id="750de238-6035-48a4-ae47-01ca6e55e53b"
+    workspace_id="8d1c951b-5b2c-4903-9364-16788c518ab8"
+    report_id="40a0a66c-d422-4c91-82ab-3c5171e16fad"
+    application_secret="aiv8Q~j3Fc6J3H~eWRBF8vzQrrISnaFOcPpc7dvn"
+    tenant_id="1345f5d4-b3ee-4534-bd31-b2cda5d2000d"
     powerbi = PowerBIEmbedder(
-        application_id="750de238-6035-48a4-ae47-01ca6e55e53b",
-        workspace_id="8d1c951b-5b2c-4903-9364-16788c518ab8",
-        report_id="40a0a66c-d422-4c91-82ab-3c5171e16fad",
-        application_secret="aiv8Q~j3Fc6J3H~eWRBF8vzQrrISnaFOcPpc7dvn",
-        tenant_id="1345f5d4-b3ee-4534-bd31-b2cda5d2000d"
+        application_id, workspace_id, report_id, application_secret, tenant_id
     )
-    iframe_html = powerbi.generate_embed_iframe(width="1200px", height="700px")
     context = {
-        'iframe_html': iframe_html,
+        "report_id": report_id,
+        "embed_url": powerbi.embed_url,
+        "embed_token": powerbi.embed_token,
+
     }
     return render(request, 'power_bi_embedded/power_bi_embed.html', context)
 

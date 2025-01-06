@@ -2,12 +2,39 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power BI Report</title>
+    <!-- Incluindo o SDK do Power BI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/powerbi-client/2.19.1/powerbi.min.js"></script>
 </head>
 <body>
     <h1>Relatório Power BI</h1>
-    <div>
-        {{ iframe_html|safe }}
-    </div>
+    <!-- Contêiner para o relatório -->
+    <div id="reportContainer" style="width: 1200px; height: 700px;"></div>
+
+    <script>
+        // Configuração do relatório
+        const embedConfig = {
+            type: "report",
+            id: "{{ report_id }}", // Report ID enviado pelo backend
+            embedUrl: "{{ embed_url }}", // Embed URL enviado pelo backend
+            accessToken: "{{ embed_token }}", // Embed Token enviado pelo backend
+            tokenType: 1, // 1 = Embed Token
+            settings: {
+                panes: {
+                    filters: { visible: false }, // Ocultar filtros
+                    pageNavigation: { visible: true } // Mostrar navegação de páginas
+                },
+                // Ajuste do campo background
+                background: undefined // Deixa o SDK gerenciar o fundo
+            }
+        };
+
+        // Obtendo o contêiner do relatório
+        const reportContainer = document.getElementById("reportContainer");
+
+        // Embutindo o relatório no contêiner
+        window.powerbi.embed(reportContainer, embedConfig);
+    </script>
 </body>
 </html>

@@ -65,6 +65,7 @@ Este manual é um guia passo a passo para embedar relatórios do Power BI em uma
    - **Report.ReadWrite.All**
    - **Content.ReadWrite.All**
    - **Workspace.Read.All**
+   - **Workspace.Read.All**
 3. Clique em **Grant Admin Consent for [Tenant Name]**.
 
 ### 4.3. Gerar Client Secret

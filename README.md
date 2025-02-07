@@ -40,6 +40,10 @@ Este manual é um guia passo a passo para embedar relatórios do Power BI em uma
 
 ## 3. Configurações do Tenant no Power BI Admin Portal
 
+### 3.1 Configuração do usuário
+
+1. Certifique que o usuário  PPU possue a role "Fabric Administrator" na organização
+
 ### 3.1. Configurar Permissões do Tenant
 1. Acesse o **Power BI Admin Portal**.
 2. Navegue até **Tenant settings** e ajuste:

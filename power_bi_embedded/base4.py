@@ -30,6 +30,8 @@ class PowerBIEmbedder:
         # Passo 3: Altera o owner do dataset
         self.update_dataset_owner()
 
+        # TODO FAZER GET DO ATUAL DATASET DATASOURCE CONNECTION DETAILS
+
         # Passo 4: Altera os paramêtros da conexão
         self.update_dataset_connection(db_parameters)
 

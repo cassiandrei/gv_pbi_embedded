@@ -30,8 +30,8 @@ class PowerBIEmbedder:
         # Passo 3: Altera o owner do dataset
         self.update_dataset_owner()
 
-        # Passo 4-old: Altera os paramêtros da conexão
-        # self.update_dataset_connection(db_parameters)
+        # Passo 4: Altera os paramêtros da conexão
+        self.update_dataset_connection(db_parameters)
 
         # Passo 4: Insere o dataset com a conexão que tem o gateway
         self.update_dataset_connection_gateway()
@@ -128,7 +128,7 @@ class PowerBIEmbedder:
         Atualiza os parâmetros de conexão do dataset.
         """
         # URL para listar datasources do dataset
-        url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/datasets/{self.dataset_id}/Default.UpdateParameters"
+        url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/datasets/{self.dataset_id}/Default.UpdateDatasources"
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
@@ -139,22 +139,27 @@ class PowerBIEmbedder:
 
         # Defina os novos parâmetros de conexão
         payload = {
-            "updateDetails": [
-                {
-                    "name": "server",
-                    "newValue": new_parameters["server"],
-                },
-                {
-                    "name": "database",
-                    "newValue": new_parameters["database"],
+          "updateDetails": [
+            {
+              "datasourceSelector": {
+                "datasourceType": "PostgreSql",
+                "connectionDetails": {
+                  "server": "190.111.179.67:54504",
+                  "database": "dbemp00609_staging",
                 }
-            ]
+              },
+              "connectionDetails": {
+                "server": new_parameters["server"],
+                "database": new_parameters["database"],
+              }
+            }
+          ]
         }
 
         response = requests.post(url, headers=headers, json=payload)
         if response.status_code != 200:
             raise Exception(
-                f"Erro ao atualizar os parâmetros de conexão: {response.status_code} - {response.text}"
+                f"Erro ao atualizar credênciais da conexão: {response.status_code} - {response.text}"
             )
 
     def update_dataset_connection_gateway(self):

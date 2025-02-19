@@ -1,7 +1,12 @@
 import base64
 import json
-
 import requests
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 
 
 class PowerBIEmbedder:
@@ -44,7 +49,10 @@ class PowerBIEmbedder:
             self.update_dataset_connection_gateway()
 
         else:
-            # Passo 5.3: Insere uma nova conexão com o gateway
+            # Passo 5.3: Obtém a public_key do gateway
+            self.gateway_public_key = self.get_gateway_public_key()
+
+            # Passo 5.4: Insere uma nova conexão com o gateway
             self.create_connection_and_add_to_gateway(db_parameters)
 
         # Passo 6: Obtém o Embed Token
@@ -114,6 +122,23 @@ class PowerBIEmbedder:
         # Converte os bytes Base64 para string
         base64_string = base64_bytes.decode("utf-8")
         return base64_string
+
+    def encrypt_credentials(self, username, password, modulus_b64, exponent_b64):
+        credentials = json.dumps({"username": username, "password": password})
+
+        # Decodificando de base64 e convertendo para inteiro
+        modulus_bytes = base64.b64decode(modulus_b64)
+        exponent_bytes = base64.b64decode(exponent_b64)
+        modulus = int.from_bytes(modulus_bytes, "big")  # Convertendo bytes para inteiro
+        exponent = int.from_bytes(
+            exponent_bytes, "big"
+        )  # Convertendo bytes para inteiro
+
+        public_key = RSA.construct((modulus, exponent), True)
+        cipher = PKCS1_OAEP.new(public_key)
+
+        encrypted_credentials = cipher.encrypt(credentials.encode())
+        return base64.b64encode(encrypted_credentials).decode()
 
     def update_dataset_owner(self):
         """
@@ -219,6 +244,26 @@ class PowerBIEmbedder:
                 f"Erro ao atualizar credênciais da conexão: {response.status_code} - {response.text}"
             )
 
+    def get_gateway_public_key(self):
+        """
+        Obtém a chave pública do gateway.
+        """
+        url = f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(
+                f"Erro ao obter os parâmetros de conexão do dataset: {response.status_code} - {response.text}"
+            )
+        response_json = response.json()
+        return {
+            "modulus": response_json["publicKey"]["modulus"],
+            "exponent": response_json["publicKey"]["exponent"],
+        }
+
     def create_connection_and_add_to_gateway(self, db_parameters):
         """
         Insere o Dataset à um Gateway.
@@ -231,16 +276,24 @@ class PowerBIEmbedder:
             "Content-Type": "application/json",
         }
 
-        credentials_base64 = self.string_to_base64(db_parameters["credentials"])
+        if not self.gateway_public_key:
+            raise Exception("Nao foi possivel obter a chave publica do gateway")
+
+        credentials_base64 = self.encrypt_credentials(
+            db_parameters["credentials"].split(":")[0],  # user
+            db_parameters["credentials"].split(":")[1],  # password
+            self.gateway_public_key["modulus"],
+            self.gateway_public_key["exponent"],
+        )
 
         payload = {
-            "connectionDetails": f'{"server":"{db_parameters['server']}","database":"{db_parameters['database']}"}',
+            "connectionDetails": f'{{"server":"{db_parameters["server"]}","database":"{db_parameters["database"]}"}}',
             "credentialDetails": {
                 "credentialType": "Windows",
                 "credentials": credentials_base64,
-                "encryptedConnection": "None",
-                "encryptionAlgorithm": "None",
-                "privacyLevel": "None",
+                "encryptedConnection": "Encrypted",
+                "encryptionAlgorithm": "RSA-OAEP",
+                "privacyLevel": "Organizational",
             },
             "datasourceName": db_parameters["database"],
             "datasourceType": "PostgreSql",

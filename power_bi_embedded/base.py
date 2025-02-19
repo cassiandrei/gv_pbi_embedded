@@ -1,4 +1,5 @@
 import base64
+import json
 
 import requests
 
@@ -30,21 +31,27 @@ class PowerBIEmbedder:
         # Passo 3: Altera o owner do dataset
         self.update_dataset_owner()
 
-        # TODO FAZER GET DO ATUAL DATASET DATASOURCE CONNECTION DETAILS
+        # Passo 4: Obtem os parâmetros de conexão
+        self.connection_details = self.get_connection_details()
 
-        # Passo 4: Altera os paramêtros da conexão
-        self.update_dataset_connection(db_parameters)
+        # Passo 5: Verifica se o dataset possui uma conexão com o gateway
+        if self.has_gateway_connection(db_parameters):
 
-        # Passo 4: Insere o dataset com a conexão que tem o gateway
-        self.update_dataset_connection_gateway()
+            # Passo 5.1: Altera os paramêtros da conexão
+            self.update_dataset_connection(db_parameters)
 
-        # Passo 5: Obtém o Embed Token
+            # Passo 5.2: Insere o dataset com a conexão que tem o gateway
+            self.update_dataset_connection_gateway()
+
+        else:
+            # Passo 5.3: Insere uma nova conexão com o gateway
+            self.create_connection_and_add_to_gateway(db_parameters)
+
+        # Passo 6: Obtém o Embed Token
         self.embed_token = self.generate_embed_token()
 
-        # Passo 6: Obtém a URL para Embedar
+        # Passo 7: Obtém a URL para Embedar
         self.embed_url = self.generate_embed_url()
-
-
 
     def generate_access_token(self):
         """
@@ -125,6 +132,54 @@ class PowerBIEmbedder:
                 f"Erro ao alterar o ownder do dataset: {response.status_code} - {response.text}"
             )
 
+    def has_gateway_connection(self, db_parameters):
+        """
+        Verifica se o dataset possui uma conexão com o gateway.
+        """
+        # URL para listar datasources do dataset
+        url = (
+            f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}/datasources"
+        )
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(
+                f"Erro ao obter os parâmetros de conexão do dataset: {response.status_code} - {response.text}"
+            )
+        connections_in_gateway: list = response.json()["value"]
+
+        for connection in connections_in_gateway:
+            connection_in_gateway: dict = json.loads(connection["connectionDetails"])
+            if (
+                connection_in_gateway["server"] == db_parameters["server"]
+                and connection_in_gateway["database"] == db_parameters["database"]
+            ):
+                return True
+        return False
+
+    def get_connection_details(self):
+        """
+        Obtem os parâmetros de conexão do dataset.
+        """
+        # URL para listar datasources do dataset
+        url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/datasets/{self.dataset_id}/datasources"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(
+                f"Erro ao obter os parâmetros de conexão do dataset: {response.status_code} - {response.text}"
+            )
+        return {
+            "server": response.json()["value"][0]["connectionDetails"]["server"],
+            "database": response.json()["value"][0]["connectionDetails"]["database"],
+        }
+
     def update_dataset_connection(self, new_parameters):
         """
         Atualiza os parâmetros de conexão do dataset.
@@ -136,26 +191,26 @@ class PowerBIEmbedder:
             "Content-Type": "application/json",
         }
 
-        credentials: str = new_parameters["credentials"]
-        credentials_base64 = self.string_to_base64(credentials)
+        if not self.connection_details:
+            raise Exception("Não foi possível obter os paramêtros de conexão")
 
         # Defina os novos parâmetros de conexão
         payload = {
-          "updateDetails": [
-            {
-              "datasourceSelector": {
-                "datasourceType": "PostgreSql",
-                "connectionDetails": {
-                  "server": "190.111.179.67:54504",
-                  "database": "dbemp00609_staging",
+            "updateDetails": [
+                {
+                    "datasourceSelector": {
+                        "datasourceType": "PostgreSql",
+                        "connectionDetails": {
+                            "server": self.connection_details["server"],
+                            "database": self.connection_details["database"],
+                        },
+                    },
+                    "connectionDetails": {
+                        "server": new_parameters["server"],
+                        "database": new_parameters["database"],
+                    },
                 }
-              },
-              "connectionDetails": {
-                "server": new_parameters["server"],
-                "database": new_parameters["database"],
-              }
-            }
-          ]
+            ]
         }
 
         response = requests.post(url, headers=headers, json=payload)
@@ -164,9 +219,42 @@ class PowerBIEmbedder:
                 f"Erro ao atualizar credênciais da conexão: {response.status_code} - {response.text}"
             )
 
+    def create_connection_and_add_to_gateway(self, db_parameters):
+        """
+        Insere o Dataset à um Gateway.
+        """
+        url = (
+            f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}/datasources"
+        )
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+
+        credentials_base64 = self.string_to_base64(db_parameters["credentials"])
+
+        payload = {
+            "connectionDetails": f'{"server":"{db_parameters['server']}","database":"{db_parameters['database']}"}',
+            "credentialDetails": {
+                "credentialType": "Windows",
+                "credentials": credentials_base64,
+                "encryptedConnection": "None",
+                "encryptionAlgorithm": "None",
+                "privacyLevel": "None",
+            },
+            "datasourceName": db_parameters["database"],
+            "datasourceType": "PostgreSql",
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code != 200:
+            raise Exception(
+                f"Erro ao atualizar ao setar o gateway ao dataset: {response.status_code} - {response.text}"
+            )
+        return response
+
     def update_dataset_connection_gateway(self):
         """
-            Insere o Dataset à um Gateway.
+        Insere o Dataset à um Gateway.
         """
         url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/datasets/{self.dataset_id}/Default.BindToGateway"
         headers = {
@@ -175,7 +263,7 @@ class PowerBIEmbedder:
         }
         payload = {
             "gatewayObjectId": self.gateway_id,
-            "datasourceObjectIds": ["5347dbfa-7497-4873-b27e-35bddf216a5b"]
+            "datasourceObjectIds": ["5347dbfa-7497-4873-b27e-35bddf216a5b"],
         }
         response = requests.post(url, headers=headers, json=payload)
         if response.status_code != 200:

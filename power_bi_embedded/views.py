@@ -1,8 +1,5 @@
-import requests
-from django.http import HttpResponse, HttpResponseNotFound
-from django.shortcuts import redirect, render
-
-from power_bi_embedded.base4 import PowerBIEmbedder
+from django.shortcuts import render
+from power_bi_embedded.base import PowerBIEmbedder
 
 
 def power_bi_view(request):
@@ -18,22 +15,25 @@ def power_bi_view(request):
     dataset_id = "af4683b6-16ff-4f3c-ab4a-a6db7ed6f8ea"
     #############################
 
-    ##### DB1 ######
+    ##### DBs ######
     db1_parameters = {
         "server": "erp-staging.connectatelecom.net",
         "database": "dbemp00577_staging",
-        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT",  # Codifique usuário:senha em Base64
+        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT"
     }
-    ################
 
-    ##### DB2 ######
     db2_parameters = {
         "server": "190.111.179.67:54504",
         "database": "dbemp00609_staging",
-        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT",  # Codifique usuário:senha em Base64
+        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT"
+    }
+
+    db3_parameters = {
+        "server": "erp-staging.speednettelecom.com.br",
+        "database": "dbemp00594_staging",
+        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT"
     }
     ################
-    
 
     powerbi = PowerBIEmbedder(
         application_id,
@@ -42,10 +42,8 @@ def power_bi_view(request):
         application_secret,
         tenant_id,
         dataset_id,
-        db_parameters=db1_parameters,
+        db_parameters=db3_parameters,
     )
-
-    
 
     context = {
         "report_id": report_id,
@@ -53,26 +51,3 @@ def power_bi_view(request):
         "embed_token": powerbi.embed_token,
     }
     return render(request, "power_bi_embedded/power_bi_embed.html", context)
-
-
-def proxy_view(request):
-    # Pass query parameters if needed
-    params = request.GET.dict()
-
-    TARGET_URL = "https://app.powerbi.com/view?r=eyJrIjoiOGFhZmE5YzYtMDkyNS00MjEzLWJlN2QtNDA4NTZiNTAwOWIwIiwidCI6IjEzNDVmNWQ0LWIzZWUtNDUzNC1iZDMxLWIyY2RhNWQyMDAwZCJ9"
-    # Fetch content from the target URL
-    response = requests.get(TARGET_URL, params=params)
-
-    # Return the content to the client
-    return HttpResponse(
-        response.content,
-        status=response.status_code,
-        content_type=response.headers["Content-Type"],
-    )
-
-
-def power_bi_view_url(request):
-    # Redireciona para a URL do Power BI
-    return redirect(
-        "https://app.powerbi.com/view?r=eyJrIjoiOGFhZmE5YzYtMDkyNS00MjEzLWJlN2QtNDA4NTZiNTAwOWIwIiwidCI6IjEzNDVmNWQ0LWIzZWUtNDUzNC1iZDMxLWIyY2RhNWQyMDAwZCJ9"
-    )

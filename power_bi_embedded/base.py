@@ -6,7 +6,7 @@ from Crypto.PublicKey import RSA
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 
 class PowerBIEmbedder:
@@ -246,7 +246,7 @@ class PowerBIEmbedder:
 
     def get_gateway_public_key(self):
         """
-        Obtém a chave pública do gateway.
+        Obtém a chave pública do gateway corretamente.
         """
         url = f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}"
         headers = {
@@ -254,42 +254,83 @@ class PowerBIEmbedder:
             "Content-Type": "application/json",
         }
         response = requests.get(url, headers=headers)
+
         if response.status_code != 200:
             raise Exception(
                 f"Erro ao obter os parâmetros de conexão do dataset: {response.status_code} - {response.text}"
             )
-        response_json = response.json()
-        return {
-            "modulus": response_json["publicKey"]["modulus"],
-            "exponent": response_json["publicKey"]["exponent"],
-        }
+
+        # Obtém os dados do JSON
+        public_key_data = response.json()["publicKey"]
+
+        modulus_b64 = public_key_data["modulus"]  # Modulus está em Base64
+        exponent_b64 = public_key_data["exponent"]  # Exponent está em Base64
+
+        # Decodifica os valores de Base64 para bytes
+        modulus = int.from_bytes(base64.b64decode(modulus_b64), byteorder="big")
+        exponent = int.from_bytes(base64.b64decode(exponent_b64), byteorder="big")
+
+        # Gera a chave pública RSA correta
+        public_numbers = rsa.RSAPublicNumbers(exponent, modulus)
+        public_key = public_numbers.public_key(backend=default_backend())
+
+        return public_key
+
 
     def create_connection_and_add_to_gateway(self, db_parameters):
         """
-        Insere o Dataset à um Gateway.
+        Cria um novo DataSource no Power BI Gateway.
+
+        :param db_parameters: Dicionário contendo 'server', 'database', 'username' e 'password'.
         """
-        url = (
-            f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}/datasources"
+
+        # Obtém a chave pública do gateway
+        public_key = self.gateway_public_key
+        if not public_key:
+            raise Exception("Chave publica do gateway nao encontrada")
+
+        # Verifica se a chave tem 2048 bits
+        print('public_key.key_size = ', public_key.key_size)
+        if public_key.key_size != 2048:
+            raise ValueError(
+                f"A chave pública tem tamanho inválido: {public_key.key_size} bits. Esperado: 2048 bits.")
+
+        # Formata as credenciais JSON
+        credentials_json = json.dumps({
+            "username": db_parameters['credentials'].split(':')[0],
+            "password": db_parameters['credentials'].split(':')[1]
+        })
+
+        # Criptografa as credenciais usando a chave pública
+        encrypted_credentials = public_key.encrypt(
+            credentials_json.encode(),
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
         )
+
+        # Converte para Base64
+        credentials_base64 = base64.b64encode(encrypted_credentials).decode()
+
+        # URL da API para criar um novo DataSource
+        url = f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}/datasources"
+
+        # Cabeçalhos da requisição
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
         }
 
-        if not self.gateway_public_key:
-            raise Exception("Nao foi possivel obter a chave publica do gateway")
-
-        credentials_base64 = self.encrypt_credentials(
-            db_parameters["credentials"].split(":")[0],  # user
-            db_parameters["credentials"].split(":")[1],  # password
-            self.gateway_public_key["modulus"],
-            self.gateway_public_key["exponent"],
-        )
-
+        # Payload da requisição
         payload = {
-            "connectionDetails": f'{{"server":"{db_parameters["server"]}","database":"{db_parameters["database"]}"}}',
+            "connectionDetails": json.dumps({
+                "server": db_parameters["server"],
+                "database": db_parameters["database"]
+            }),
             "credentialDetails": {
-                "credentialType": "Windows",
+                "credentialType": "Basic",
                 "credentials": credentials_base64,
                 "encryptedConnection": "Encrypted",
                 "encryptionAlgorithm": "RSA-OAEP",
@@ -298,12 +339,16 @@ class PowerBIEmbedder:
             "datasourceName": db_parameters["database"],
             "datasourceType": "PostgreSql",
         }
+
+        # Faz a requisição POST para criar o DataSource
         response = requests.post(url, headers=headers, json=payload)
-        if response.status_code != 200:
-            raise Exception(
-                f"Erro ao atualizar ao setar o gateway ao dataset: {response.status_code} - {response.text}"
-            )
-        return response
+
+        # Trata a resposta da API
+        if response.status_code == 201:
+            return response.json()
+        else:
+            raise Exception(f"Erro ao criar DataSource: {response.status_code} - {response.text}")
+
 
     def update_dataset_connection_gateway(self):
         """

@@ -1,11 +1,11 @@
 import base64
 import json
+
 import requests
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
 
@@ -36,24 +36,14 @@ class PowerBIEmbedder:
         # Passo 3: Altera o owner do dataset
         self.update_dataset_owner()
 
-        # Passo 4: Obtem os parâmetros de conexão
-        self.connection_details = self.get_connection_details()
+        # Passo 4: Altera os paramêtros da conexão
+        self.update_datasource_parameters(db_parameters)
 
         # Passo 5: Verifica se o dataset possui uma conexão com o gateway
         if self.has_gateway_connection(db_parameters):
 
-            # Passo 5.1: Altera os paramêtros da conexão
-            self.update_dataset_connection(db_parameters)
-
-            # Passo 5.2: Insere o dataset com a conexão que tem o gateway
+            # Passo 5.1: Insere o dataset com a conexão que tem o gateway
             self.update_dataset_connection_gateway()
-
-        else:
-            # Passo 5.3: Obtém a public_key do gateway
-            self.gateway_public_key = self.get_gateway_public_key()
-
-            # Passo 5.4: Insere uma nova conexão com o gateway
-            self.create_connection_and_add_to_gateway(db_parameters)
 
         # Passo 6: Obtém o Embed Token
         self.embed_token = self.generate_embed_token()
@@ -111,35 +101,6 @@ class PowerBIEmbedder:
         """
         return f"https://app.powerbi.com/reportEmbed?reportId={self.report_id}&groupId={self.workspace_id}"
 
-    def string_to_base64(self, input_string):
-        """
-        Converte uma string para Base64.
-        """
-        # Encode a string para bytes
-        bytes_string = input_string.encode("utf-8")
-        # Codifica os bytes em Base64
-        base64_bytes = base64.b64encode(bytes_string)
-        # Converte os bytes Base64 para string
-        base64_string = base64_bytes.decode("utf-8")
-        return base64_string
-
-    def encrypt_credentials(self, username, password, modulus_b64, exponent_b64):
-        credentials = json.dumps({"username": username, "password": password})
-
-        # Decodificando de base64 e convertendo para inteiro
-        modulus_bytes = base64.b64decode(modulus_b64)
-        exponent_bytes = base64.b64decode(exponent_b64)
-        modulus = int.from_bytes(modulus_bytes, "big")  # Convertendo bytes para inteiro
-        exponent = int.from_bytes(
-            exponent_bytes, "big"
-        )  # Convertendo bytes para inteiro
-
-        public_key = RSA.construct((modulus, exponent), True)
-        cipher = PKCS1_OAEP.new(public_key)
-
-        encrypted_credentials = cipher.encrypt(credentials.encode())
-        return base64.b64encode(encrypted_credentials).decode()
-
     def update_dataset_owner(self):
         """
         Altera o owner do dataset para o usuário autenticado.
@@ -185,26 +146,6 @@ class PowerBIEmbedder:
                 return True
         return False
 
-    def get_connection_details(self):
-        """
-        Obtem os parâmetros de conexão do dataset.
-        """
-        # URL para listar datasources do dataset
-        url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/datasets/{self.dataset_id}/datasources"
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            raise Exception(
-                f"Erro ao obter os parâmetros de conexão do dataset: {response.status_code} - {response.text}"
-            )
-        return {
-            "server": response.json()["value"][0]["connectionDetails"]["server"],
-            "database": response.json()["value"][0]["connectionDetails"]["database"],
-        }
-
     def update_dataset_connection(self, new_parameters):
         """
         Atualiza os parâmetros de conexão do dataset.
@@ -244,6 +185,37 @@ class PowerBIEmbedder:
                 f"Erro ao atualizar credênciais da conexão: {response.status_code} - {response.text}"
             )
 
+    def update_datasource_parameters(self, new_parameters):
+        """
+        Atualiza os parâmetros de conexão do dataset.
+        """
+        # URL para listar datasources do dataset
+        url = f"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/datasets/{self.dataset_id}/Default.UpdateParameters"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+
+        # Defina os novos parâmetros de conexão
+        payload = {
+            "updateDetails": [
+                {
+                    "name": "server",
+                    "newValue": new_parameters["server"],
+                },
+                {
+                    "name": "database",
+                    "newValue": new_parameters["database"],
+                },
+            ]
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code != 200:
+            raise Exception(
+                f"Erro ao atualizar os parâmetros de conexão: {response.status_code} - {response.text}"
+            )
+
     def get_gateway_public_key(self):
         """
         Obtém a chave pública do gateway.
@@ -263,47 +235,6 @@ class PowerBIEmbedder:
             "modulus": response_json["publicKey"]["modulus"],
             "exponent": response_json["publicKey"]["exponent"],
         }
-
-    def create_connection_and_add_to_gateway(self, db_parameters):
-        """
-        Insere o Dataset à um Gateway.
-        """
-        url = (
-            f"https://api.powerbi.com/v1.0/myorg/gateways/{self.gateway_id}/datasources"
-        )
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-
-        if not self.gateway_public_key:
-            raise Exception("Nao foi possivel obter a chave publica do gateway")
-
-        credentials_base64 = self.encrypt_credentials(
-            db_parameters["credentials"].split(":")[0],  # user
-            db_parameters["credentials"].split(":")[1],  # password
-            self.gateway_public_key["modulus"],
-            self.gateway_public_key["exponent"],
-        )
-
-        payload = {
-            "connectionDetails": f'{{"server":"{db_parameters["server"]}","database":"{db_parameters["database"]}"}}',
-            "credentialDetails": {
-                "credentialType": "Windows",
-                "credentials": credentials_base64,
-                "encryptedConnection": "Encrypted",
-                "encryptionAlgorithm": "RSA-OAEP",
-                "privacyLevel": "Organizational",
-            },
-            "datasourceName": db_parameters["database"],
-            "datasourceType": "PostgreSql",
-        }
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code != 200:
-            raise Exception(
-                f"Erro ao atualizar ao setar o gateway ao dataset: {response.status_code} - {response.text}"
-            )
-        return response
 
     def update_dataset_connection_gateway(self):
         """

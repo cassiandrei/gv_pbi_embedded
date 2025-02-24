@@ -1,4 +1,5 @@
 from django.shortcuts import render
+
 from power_bi_embedded.base import PowerBIEmbedder
 
 
@@ -19,19 +20,19 @@ def power_bi_view(request):
     db1_parameters = {
         "server": "erp-staging.connectatelecom.net",
         "database": "dbemp00577_staging",
-        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT"
+        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT",
     }
 
     db2_parameters = {
         "server": "190.111.179.67:54504",
         "database": "dbemp00609_staging",
-        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT"
+        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT",
     }
 
     db3_parameters = {
         "server": "erp-staging.speednettelecom.com.br",
         "database": "dbemp00594_staging",
-        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT"
+        "credentials": "voalle_db_lucasheinen:d6fI_iminoseDRaT",
     }
     ################
 
